@@ -54,7 +54,6 @@ O projeto está sendo desenvolvido de forma incremental através das ACs.
 * Visual Studio Code
 * Swagger
 * Git/GitHub
-* Trello
 
 ## 📁 Estrutura
 
