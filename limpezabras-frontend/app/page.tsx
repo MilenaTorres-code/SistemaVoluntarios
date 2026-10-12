@@ -8,8 +8,10 @@ import {
   ChevronLeft,
   ChevronRight,
   LogIn,
+  Pencil,
   Plus,
   Search,
+  Trash2,
   UserCheck,
   UserRound,
   Users,
@@ -17,11 +19,17 @@ import {
 } from "lucide-react";
 
 import {
+  ativarVoluntario,
+  atualizarPresenca,
   buscarPresencas,
   buscarResumo,
   buscarVoluntarios,
+  buscarVoluntariosPorNome,
   cadastrarVoluntario,
+  excluirVoluntario,
+  inativarVoluntario,
   registrarPresenca,
+  removerPresenca,
 } from "@/lib/api";
 
 type Voluntario = {
@@ -35,6 +43,12 @@ type Voluntario = {
   sexo: string;
   ativo: boolean;
 };
+
+// O endpoint de busca devolve só os campos necessários para seleção.
+type VoluntarioResumo = Pick<
+  Voluntario,
+  "id" | "numeroCadastro" | "nome" | "ativo"
+>;
 
 type Presenca = {
   id: number;
@@ -52,11 +66,25 @@ type Resumo = {
   mulheres: number;
 };
 
+function formatarDataApi(data: Date) {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+function iniciais(nome: string) {
+  return nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join("");
+}
+
 export default function Home() {
-  const [mesAtual, setMesAtual] = useState(new Date(2026, 8, 12));
-  const [dataSelecionada, setDataSelecionada] = useState(
-    new Date(2026, 8, 12)
-  );
+  const [mesAtual, setMesAtual] = useState(() => new Date());
+  const [dataSelecionada, setDataSelecionada] = useState(() => new Date());
   const [calendarioAberto, setCalendarioAberto] = useState(false);
 
   const [voluntarios, setVoluntarios] = useState<Voluntario[]>([]);
@@ -69,6 +97,24 @@ export default function Home() {
   });
 
   const [busca, setBusca] = useState("");
+  const [resultadosBusca, setResultadosBusca] = useState<VoluntarioResumo[]>(
+    []
+  );
+  const [buscando, setBuscando] = useState(false);
+  const [filtroPresencas, setFiltroPresencas] = useState("");
+
+  const [presencaEmEdicao, setPresencaEmEdicao] = useState<Presenca | null>(
+    null
+  );
+  const [novaDataPresenca, setNovaDataPresenca] = useState("");
+  const [salvandoPresenca, setSalvandoPresenca] = useState(false);
+
+  const [voluntariosAberto, setVoluntariosAberto] = useState(false);
+  const [filtroVoluntarios, setFiltroVoluntarios] = useState("");
+  const [processandoVoluntarioId, setProcessandoVoluntarioId] = useState<
+    number | null
+  >(null);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [loginAberto, setLoginAberto] = useState(false);
   const [cadastroAberto, setCadastroAberto] = useState(false);
@@ -112,12 +158,28 @@ export default function Home() {
     year: "numeric",
   });
 
-  const dataApi = `${dataSelecionada.getFullYear()}-${String(
-    dataSelecionada.getMonth() + 1
-  ).padStart(2, "0")}-${String(dataSelecionada.getDate()).padStart(2, "0")}`;
+  const dataApi = formatarDataApi(dataSelecionada);
 
-  const voluntariosFiltrados = useMemo(() => {
-    const termo = busca.toLowerCase().trim();
+  // Sem termo digitado, o modal mostra todos os voluntários já carregados;
+  // com termo, mostra o resultado da busca feita no back-end.
+  const voluntariosDoModal: VoluntarioResumo[] = busca.trim()
+    ? resultadosBusca
+    : voluntarios;
+
+  const presencasFiltradas = useMemo(() => {
+    const termo = filtroPresencas.toLowerCase().trim();
+
+    if (!termo) {
+      return presencas;
+    }
+
+    return presencas.filter((presenca) =>
+      presenca.nome.toLowerCase().includes(termo)
+    );
+  }, [presencas, filtroPresencas]);
+
+  const voluntariosGerenciados = useMemo(() => {
+    const termo = filtroVoluntarios.toLowerCase().trim();
 
     if (!termo) {
       return voluntarios;
@@ -126,7 +188,7 @@ export default function Home() {
     return voluntarios.filter((voluntario) =>
       voluntario.nome.toLowerCase().includes(termo)
     );
-  }, [voluntarios, busca]);
+  }, [voluntarios, filtroVoluntarios]);
 
   const idsPresentes = useMemo(() => {
     return new Set(presencas.map((presenca) => presenca.voluntarioId));
@@ -139,6 +201,43 @@ export default function Home() {
   useEffect(() => {
     carregarDadosDoDia();
   }, [dataSelecionada]);
+
+  // Busca pelo nome no back-end, esperando o usuário parar de digitar.
+  useEffect(() => {
+    const termo = busca.trim();
+
+    if (!modalAberto || !termo) {
+      setResultadosBusca([]);
+      setBuscando(false);
+      return;
+    }
+
+    let cancelado = false;
+    setBuscando(true);
+
+    const temporizador = setTimeout(async () => {
+      try {
+        const dados = await buscarVoluntariosPorNome(termo);
+
+        if (!cancelado) {
+          setResultadosBusca(dados);
+        }
+      } catch {
+        if (!cancelado) {
+          mostrarMensagem("Não foi possível buscar os voluntários.", 4000);
+        }
+      } finally {
+        if (!cancelado) {
+          setBuscando(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(temporizador);
+    };
+  }, [busca, modalAberto]);
 
   async function carregarVoluntarios() {
     try {
@@ -325,12 +424,8 @@ export default function Home() {
     }
   }
 
-  async function registrar(id: number) {
-    const voluntario = voluntarios.find((item) => item.id === id);
-
-    if (!voluntario) {
-      return;
-    }
+  async function registrar(voluntario: VoluntarioResumo) {
+    const id = voluntario.id;
 
     if (!voluntario.ativo) {
       mostrarMensagem(
@@ -368,6 +463,141 @@ export default function Home() {
       );
     } finally {
       setCarregando(false);
+    }
+  }
+
+  function abrirEdicaoPresenca(presenca: Presenca) {
+    setMensagem("");
+    setPresencaEmEdicao(presenca);
+    // A API devolve "2026-10-12T00:00:00"; o input de data usa só "2026-10-12".
+    setNovaDataPresenca(presenca.data.slice(0, 10));
+  }
+
+  function fecharEdicaoPresenca() {
+    if (salvandoPresenca) {
+      return;
+    }
+    setPresencaEmEdicao(null);
+  }
+
+  async function salvarEdicaoPresenca(
+    evento: React.FormEvent<HTMLFormElement>
+  ) {
+    evento.preventDefault();
+
+    if (!presencaEmEdicao) {
+      return;
+    }
+
+    if (!novaDataPresenca) {
+      mostrarMensagem("Informe a nova data da presença.");
+      return;
+    }
+
+    try {
+      setSalvandoPresenca(true);
+
+      await atualizarPresenca(
+        presencaEmEdicao.id,
+        presencaEmEdicao.voluntarioId,
+        novaDataPresenca
+      );
+
+      await carregarDadosDoDia();
+      setPresencaEmEdicao(null);
+
+      mostrarMensagem(
+        `Presença de ${presencaEmEdicao.nome} alterada com sucesso.`
+      );
+    } catch (error) {
+      mostrarMensagem(
+        error instanceof Error ? error.message : "Erro ao alterar presença.",
+        4000
+      );
+    } finally {
+      setSalvandoPresenca(false);
+    }
+  }
+
+  async function removerRegistroPresenca(presenca: Presenca) {
+    const confirmado = window.confirm(
+      `Remover a presença de ${presenca.nome} neste dia?`
+    );
+
+    if (!confirmado) {
+      return;
+    }
+
+    try {
+      await removerPresenca(presenca.id);
+      await carregarDadosDoDia();
+      mostrarMensagem(`Presença de ${presenca.nome} removida.`);
+    } catch (error) {
+      mostrarMensagem(
+        error instanceof Error ? error.message : "Erro ao remover presença.",
+        4000
+      );
+    }
+  }
+
+  function abrirVoluntarios() {
+    setMensagem("");
+    setFiltroVoluntarios("");
+    setVoluntariosAberto(true);
+    carregarVoluntarios();
+  }
+
+  async function alternarAtivo(voluntario: Voluntario) {
+    try {
+      setProcessandoVoluntarioId(voluntario.id);
+
+      if (voluntario.ativo) {
+        await inativarVoluntario(voluntario.id);
+      } else {
+        await ativarVoluntario(voluntario.id);
+      }
+
+      await carregarVoluntarios();
+
+      mostrarMensagem(
+        `${voluntario.nome} ${voluntario.ativo ? "inativado" : "ativado"}.`
+      );
+    } catch (error) {
+      mostrarMensagem(
+        error instanceof Error
+          ? error.message
+          : "Erro ao alterar a situação do voluntário.",
+        4000
+      );
+    } finally {
+      setProcessandoVoluntarioId(null);
+    }
+  }
+
+  async function excluir(voluntario: Voluntario) {
+    const confirmado = window.confirm(
+      `Excluir ${voluntario.nome} definitivamente? Essa ação não pode ser desfeita.`
+    );
+
+    if (!confirmado) {
+      return;
+    }
+
+    try {
+      setProcessandoVoluntarioId(voluntario.id);
+
+      await excluirVoluntario(voluntario.id);
+      await carregarVoluntarios();
+
+      mostrarMensagem(`${voluntario.nome} foi excluído.`);
+    } catch (error) {
+      // Se tiver presenças, a API responde 409 explicando que é preciso inativar.
+      mostrarMensagem(
+        error instanceof Error ? error.message : "Erro ao excluir voluntário.",
+        5000
+      );
+    } finally {
+      setProcessandoVoluntarioId(null);
     }
   }
 
@@ -651,14 +881,20 @@ export default function Home() {
 
             <input
               type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar voluntário..."
+              value={filtroPresencas}
+              onChange={(e) => setFiltroPresencas(e.target.value)}
+              placeholder="Filtrar presenças pelo nome..."
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
           </div>
 
           <div className="space-y-2.5">
+            {presencas.length > 0 && presencasFiltradas.length === 0 && (
+              <p className="py-6 text-center text-sm font-bold text-slate-500">
+                Nenhuma presença encontrada para “{filtroPresencas}”.
+              </p>
+            )}
+
             {presencas.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-400">
@@ -674,18 +910,14 @@ export default function Home() {
                 </p>
               </div>
             ) : (
-              presencas.map((presenca) => (
+              presencasFiltradas.map((presenca) => (
                 <div
                   key={presenca.id}
                   className="flex items-center justify-between rounded-3xl border border-slate-100 bg-white p-3.5 shadow-sm"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-extrabold text-emerald-600">
-                      {presenca.nome
-                        .split(" ")
-                        .slice(0, 2)
-                        .map((parte) => parte[0])
-                        .join("")}
+                      {iniciais(presenca.nome)}
                     </div>
 
                     <div className="min-w-0">
@@ -699,14 +931,30 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <div className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600 sm:block">
                       Presente
                     </div>
 
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                      <UserCheck size={16} />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => abrirEdicaoPresenca(presenca)}
+                      title="Alterar presença"
+                      aria-label={`Alterar presença de ${presenca.nome}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-600"
+                    >
+                      <Pencil size={15} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removerRegistroPresenca(presenca)}
+                      title="Remover presença"
+                      aria-label={`Remover presença de ${presenca.nome}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-red-50 hover:text-red-500"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               ))
@@ -717,7 +965,7 @@ export default function Home() {
 
       {/* BARRA DE NAVEGAÇÃO FIXA NO RODAPÉ */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-6 py-3 shadow-[0_-5px_20px_rgba(0,0,0,0.04)] backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-center">
+        <div className="mx-auto flex max-w-md items-center justify-center gap-3">
           <button
             type="button"
             onClick={abrirCadastro}
@@ -725,6 +973,15 @@ export default function Home() {
           >
             <UserRound size={18} />
             <span>Cadastro</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={abrirVoluntarios}
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95 shadow-sm"
+          >
+            <Users size={18} />
+            <span>Voluntários</span>
           </button>
         </div>
       </nav>
@@ -771,7 +1028,11 @@ export default function Home() {
             </div>
 
             <div className="max-h-[55vh] space-y-2 overflow-y-auto">
-              {voluntariosFiltrados.length === 0 ? (
+              {buscando ? (
+                <p className="py-8 text-center text-sm font-bold text-slate-400">
+                  Buscando...
+                </p>
+              ) : voluntariosDoModal.length === 0 ? (
                 <div className="py-8 text-center">
                   <Search size={28} className="mx-auto mb-3 text-slate-300" />
 
@@ -780,7 +1041,7 @@ export default function Home() {
                   </p>
                 </div>
               ) : (
-                voluntariosFiltrados.map((voluntario) => {
+                voluntariosDoModal.map((voluntario) => {
                   const presente = idsPresentes.has(voluntario.id);
                   const inativo = !voluntario.ativo;
 
@@ -803,11 +1064,7 @@ export default function Home() {
                               : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          {voluntario.nome
-                            .split(" ")
-                            .slice(0, 2)
-                            .map((parte) => parte[0])
-                            .join("")}
+                          {iniciais(voluntario.nome)}
                         </div>
 
                         <div className="min-w-0">
@@ -829,7 +1086,7 @@ export default function Home() {
 
                       <button
                         disabled={presente || inativo || carregando}
-                        onClick={() => registrar(voluntario.id)}
+                        onClick={() => registrar(voluntario)}
                         className={`ml-3 shrink-0 rounded-xl px-3 py-2 text-[11px] font-extrabold transition ${
                           presente
                             ? "bg-emerald-100 text-emerald-700"
@@ -854,6 +1111,175 @@ export default function Home() {
 
             <button
               onClick={fecharModal}
+              className="mt-4 w-full rounded-2xl bg-slate-100 px-4 py-3.5 text-sm font-extrabold text-slate-600"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {presencaEmEdicao && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
+          <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">
+                  Alterar registro
+                </p>
+
+                <h3 className="mt-1 text-xl font-extrabold text-[#174b45]">
+                  {presencaEmEdicao.nome}
+                </h3>
+
+                <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+                  Cadastro #{presencaEmEdicao.numeroCadastro}
+                </p>
+              </div>
+
+              <button
+                onClick={fecharEdicaoPresenca}
+                disabled={salvandoPresenca}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={salvarEdicaoPresenca} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Data da presença
+                </label>
+
+                <input
+                  type="date"
+                  value={novaDataPresenca}
+                  onChange={(e) => setNovaDataPresenca(e.target.value)}
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={salvandoPresenca}
+                className="w-full rounded-2xl bg-emerald-500 px-4 py-3.5 text-sm font-extrabold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {salvandoPresenca ? "Salvando..." : "Salvar alteração"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {voluntariosAberto && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
+          <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">
+                  {voluntarios.length} cadastrados
+                </p>
+
+                <h3 className="mt-1 text-xl font-extrabold text-[#174b45]">
+                  Voluntários
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setVoluntariosAberto(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <Search size={18} className="text-slate-400" />
+
+              <input
+                type="text"
+                value={filtroVoluntarios}
+                onChange={(e) => setFiltroVoluntarios(e.target.value)}
+                placeholder="Buscar voluntário..."
+                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </div>
+
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+              {voluntariosGerenciados.length === 0 ? (
+                <p className="py-8 text-center font-bold text-slate-600">
+                  Nenhum voluntário encontrado
+                </p>
+              ) : (
+                voluntariosGerenciados.map((voluntario) => {
+                  const processando =
+                    processandoVoluntarioId === voluntario.id;
+
+                  return (
+                    <div
+                      key={voluntario.id}
+                      className={`flex items-center justify-between rounded-2xl border p-3 ${
+                        voluntario.ativo
+                          ? "border-slate-200 bg-white"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-extrabold text-slate-600">
+                          {iniciais(voluntario.nome)}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold">
+                            {voluntario.nome}
+                          </p>
+
+                          <p className="text-[11px] text-slate-400">
+                            Cadastro #{voluntario.numeroCadastro}
+                            {!voluntario.ativo && (
+                              <span className="ml-1.5 font-bold text-red-500">
+                                · Inativo
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="ml-3 flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={processando}
+                          onClick={() => alternarAtivo(voluntario)}
+                          className={`rounded-xl px-3 py-2 text-[11px] font-extrabold transition disabled:opacity-50 ${
+                            voluntario.ativo
+                              ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              : "bg-emerald-500 text-white hover:bg-emerald-600"
+                          }`}
+                        >
+                          {voluntario.ativo ? "Inativar" : "Ativar"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={processando}
+                          onClick={() => excluir(voluntario)}
+                          title="Excluir voluntário"
+                          aria-label={`Excluir ${voluntario.nome}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <button
+              onClick={() => setVoluntariosAberto(false)}
               className="mt-4 w-full rounded-2xl bg-slate-100 px-4 py-3.5 text-sm font-extrabold text-slate-600"
             >
               Fechar

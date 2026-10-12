@@ -137,7 +137,7 @@ export async function ativarVoluntario(id: number) {
   const resposta = await fetch(
     `${API_URL}/Voluntarios/${id}/ativar`,
     {
-      method: "PUT",
+      method: "PATCH",
     }
   );
 
@@ -160,7 +160,7 @@ export async function inativarVoluntario(id: number) {
   const resposta = await fetch(
     `${API_URL}/Voluntarios/${id}/inativar`,
     {
-      method: "PUT",
+      method: "PATCH",
     }
   );
 
@@ -225,4 +225,93 @@ export async function removerPresenca(id: number) {
   }
 
   return resposta.json();
+
+}
+
+
+export async function buscarVoluntariosPorNome(nome: string) {
+  const resposta = await fetch(
+    `${API_URL}/Voluntarios/buscar?nome=${encodeURIComponent(nome)}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao buscar voluntários.");
+  }
+
+  return resposta.json();
+}
+
+export async function atualizarPresenca(
+  id: number,
+  voluntarioId: number,
+  data: string
+) {
+  const resposta = await fetch(
+    `${API_URL}/Presencas/${id}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        voluntarioId,
+        data,
+      }),
+    }
+  );
+
+  const texto = await resposta.text();
+
+  if (!resposta.ok) {
+    throw new Error(
+      texto || "Erro ao alterar presença."
+    );
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return texto;
+  }
+}
+
+export async function buscarPresencasDoVoluntario(voluntarioId: number) {
+  const resposta = await fetch(
+    `${API_URL}/Presencas/voluntario/${voluntarioId}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao buscar presenças do voluntário.");
+  }
+
+  return resposta.json();
+}
+
+export async function excluirVoluntario(id: number) {
+  const resposta = await fetch(
+    `${API_URL}/Voluntarios/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  const texto = await resposta.text();
+
+  if (!resposta.ok) {
+    throw new Error(
+      texto || "Erro ao excluir voluntário."
+    );
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return texto;
+  }
 }

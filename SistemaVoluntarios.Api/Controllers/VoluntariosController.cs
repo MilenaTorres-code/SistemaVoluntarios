@@ -186,9 +186,11 @@ public class VoluntariosController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(nome))
             return BadRequest("Informe o nome do voluntário.");
+       
+        var termo = nome.Trim();
 
         var voluntarios = await _context.Voluntarios
-            .Where(v => v.Nome.Contains(nome))
+            .Where(v => v.Nome.Contains(termo))
             .OrderBy(v => v.Nome)
             .Select(v => new
             {
@@ -197,10 +199,41 @@ public class VoluntariosController : ControllerBase
                 v.Nome,
                 v.Cpf,
                 v.Celular,
+                v.Sexo,
                 v.Ativo
             })
             .ToListAsync();
 
         return Ok(voluntarios);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Excluir(int id)
+    {
+        var voluntario = await _context.Voluntarios
+            .FirstOrDefaultAsync(v => v.Id == id);
+
+        if (voluntario == null)
+        {
+            return NotFound("Voluntário não encontrado.");
+        }
+
+        var possuiPresencas = await _context.Presencas
+            .AnyAsync(p => p.VoluntarioId == id);
+
+        if (possuiPresencas)
+        {
+            return Conflict(
+                "Este voluntário possui presenças registradas e não pode ser excluído. Inative o cadastro para manter o histórico.");
+        }
+
+        _context.Voluntarios.Remove(voluntario);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            mensagem = "Voluntário excluído com sucesso."
+        });
     }
 }
