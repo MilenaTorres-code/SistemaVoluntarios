@@ -1,6 +1,6 @@
 # 🧹 Limpeza Brás
 
-Sistema desenvolvido para auxiliar no gerenciamento de voluntários e, futuramente, no controle de presença e frequência.
+Sistema desenvolvido para auxiliar no gerenciamento de voluntários e no controle de presença e frequência.
 
 O projeto está sendo desenvolvido de forma incremental através das ACs.
 
@@ -19,12 +19,26 @@ O projeto está sendo desenvolvido de forma incremental através das ACs.
 * Persistência no banco de dados
 * Testes da API com Swagger
 
+### AC2 — Busca e registro de presença
+
+**✅ Concluído**
+
+* Busca de voluntário pelo nome
+* Seleção do voluntário
+* Registro de presença com data
+* Bloqueio de presença duplicada no mesmo dia
+* Consulta das presenças do dia e resumo (total, homens e mulheres)
+* Alteração de registro de presença
+* Ativação e inativação de voluntário
+* Bloqueio de presença para voluntário inativo
+* Integração Front-end e Back-end
+* Persistência no banco de dados
+* Testes da API com Swagger
+
 ### Próximas etapas
 
-**🔄 Planejado**
+**📌 Planejado**
 
-* Busca de voluntários
-* Registro de presença
 * Calendário de presença
 * Controle de frequência
 * Dashboard
@@ -66,33 +80,23 @@ SistemaVoluntarios/
 
 ## 🗄️ Banco de dados
 
-A tabela principal da AC1 é:
+Tabelas principais:
 
 ```text
-voluntarios
-```
-
-## 🔌 API
-
-Principais endpoints:
-
-```text
-GET  /api/Voluntarios
-POST /api/Voluntarios
-PUT  /api/Voluntarios/{id}
+voluntarios   → cadastro dos voluntários (AC1)
+presencas     → registros de presença por data (AC2)
 ```
 
 A API é desenvolvida em ASP.NET Core e utiliza Entity Framework Core para comunicação com o banco de dados.
 
 ## 📋 Desenvolvimento
 
-As tarefas do projeto são acompanhadas prlo git e este README será atualizado conforme cada AC for concluída.
+As tarefas do projeto são acompanhadas pelo GitHub Projects e pelas issues, e este README é atualizado conforme cada AC é concluída.
 
 ### Legenda
 
 * ✅ Concluído
 * 🔄 Em andamento
 * 📌 Planejado
-
 
 Desenvolvido por Milena Torres
