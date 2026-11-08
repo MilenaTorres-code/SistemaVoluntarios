@@ -315,3 +315,75 @@ export async function excluirVoluntario(id: number) {
     return texto;
   }
 }
+
+export async function login(email: string, senha: string) {
+  const resposta = await fetch(
+    `${API_URL}/Auth/login`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        senha,
+      }),
+    }
+  );
+
+  const texto = await resposta.text();
+
+  if (!resposta.ok) {
+    throw new Error(
+      texto || "Erro ao realizar login."
+    );
+  }
+
+  return JSON.parse(texto);
+}
+
+export async function buscarAniversariantes(mes: number) {
+  const resposta = await fetch(
+    `${API_URL}/Voluntarios/aniversariantes?mes=${mes}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao buscar aniversariantes.");
+  }
+
+  return resposta.json();
+}
+
+export async function cadastrarUsuario(
+  nome: string,
+  email: string,
+  senha: string
+) {
+  const resposta = await fetch(
+    `${API_URL}/Auth/cadastrar`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        nome,
+        email,
+        senha,
+      }),
+    }
+  );
+
+  const texto = await resposta.text();
+
+  if (!resposta.ok) {
+    throw new Error(
+      texto || "Erro ao criar conta."
+    );
+  }
+
+  return JSON.parse(texto);
+}

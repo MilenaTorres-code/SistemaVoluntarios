@@ -207,6 +207,36 @@ public class VoluntariosController : ControllerBase
         return Ok(voluntarios);
     }
 
+    [HttpGet("aniversariantes")]
+    public async Task<IActionResult> Aniversariantes(int? mes)
+    {
+        var mesConsulta = mes ?? DateTime.Now.Month;
+
+        if (mesConsulta < 1 || mesConsulta > 12)
+            return BadRequest("Informe um mês entre 1 e 12.");
+
+        var aniversariantes = await _context.Voluntarios
+            .Where(v => v.Ativo && v.DataNascimento.Month == mesConsulta)
+            .OrderBy(v => v.DataNascimento.Day)
+            .ThenBy(v => v.Nome)
+            .Select(v => new
+            {
+                v.Id,
+                v.NumeroCadastro,
+                v.Nome,
+                v.DataNascimento,
+                Dia = v.DataNascimento.Day
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            mes = mesConsulta,
+            total = aniversariantes.Count,
+            aniversariantes
+        });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Excluir(int id)
     {
@@ -236,4 +266,4 @@ public class VoluntariosController : ControllerBase
             mensagem = "Voluntário excluído com sucesso."
         });
     }
-}
+}

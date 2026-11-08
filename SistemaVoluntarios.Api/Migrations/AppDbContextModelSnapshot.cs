@@ -45,6 +45,40 @@ namespace SistemaVoluntarios.Api.Migrations
                     b.ToTable("presencas", (string)null);
                 });
 
+            modelBuilder.Entity("SistemaVoluntarios.Api.Models.Usuarios", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("SenhaHash")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("senha_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("usuarios", (string)null);
+                });
+
             modelBuilder.Entity("SistemaVoluntarios.Api.Models.Voluntarios", b =>
                 {
                     b.Property<int>("Id")

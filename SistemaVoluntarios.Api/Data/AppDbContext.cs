@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Presencas> Presencas => Set<Presencas>();
 
+    public DbSet<Usuarios> Usuarios => Set<Usuarios>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -85,5 +87,29 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Presencas>()
             .Property(p => p.CriadoEm)
             .HasColumnName("criado_em");
+
+        modelBuilder.Entity<Usuarios>()
+            .ToTable("usuarios");
+
+        modelBuilder.Entity<Usuarios>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<Usuarios>()
+            .Property(u => u.Nome)
+            .HasColumnName("nome");
+
+        modelBuilder.Entity<Usuarios>()
+            .Property(u => u.Email)
+            .HasColumnName("email")
+            .HasMaxLength(150);
+
+        modelBuilder.Entity<Usuarios>()
+            .Property(u => u.SenhaHash)
+            .HasColumnName("senha_hash");
+
+        modelBuilder.Entity<Usuarios>()
+            .Property(u => u.CriadoEm)
+            .HasColumnName("criado_em");
     }
-}
+}

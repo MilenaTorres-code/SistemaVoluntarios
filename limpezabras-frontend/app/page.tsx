@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import {
   CalendarDays,
   ChevronDown,
   ChevronLeft,
+  Cake,
   ChevronRight,
   LogIn,
+  LogOut,
   Pencil,
   Plus,
   Search,
@@ -25,12 +28,20 @@ import {
   buscarResumo,
   buscarVoluntarios,
   buscarVoluntariosPorNome,
+  cadastrarUsuario,
   cadastrarVoluntario,
   excluirVoluntario,
   inativarVoluntario,
+  login,
   registrarPresenca,
   removerPresenca,
 } from "@/lib/api";
+
+type Usuario = {
+  id: number;
+  nome: string;
+  email: string;
+};
 
 type Voluntario = {
   id: number;
@@ -83,6 +94,9 @@ function iniciais(nome: string) {
 }
 
 export default function Home() {
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [verificandoSessao, setVerificandoSessao] = useState(true);
+
   const [mesAtual, setMesAtual] = useState(() => new Date());
   const [dataSelecionada, setDataSelecionada] = useState(() => new Date());
   const [calendarioAberto, setCalendarioAberto] = useState(false);
@@ -116,7 +130,6 @@ export default function Home() {
   >(null);
 
   const [modalAberto, setModalAberto] = useState(false);
-  const [loginAberto, setLoginAberto] = useState(false);
   const [cadastroAberto, setCadastroAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [carregandoLogin, setCarregandoLogin] = useState(false);
@@ -126,6 +139,16 @@ export default function Home() {
   const [formularioLogin, setFormularioLogin] = useState({
     email: "",
     senha: "",
+  });
+
+  const [abaAcesso, setAbaAcesso] = useState<"entrar" | "criar">("entrar");
+  const [carregandoConta, setCarregandoConta] = useState(false);
+
+  const [formularioConta, setFormularioConta] = useState({
+    nome: "",
+    email: "",
+    senha: "",
+    confirmarSenha: "",
   });
 
   const [formularioCadastro, setFormularioCadastro] = useState({
@@ -195,12 +218,34 @@ export default function Home() {
   }, [presencas]);
 
   useEffect(() => {
-    carregarVoluntarios();
+    try {
+      const salvo = localStorage.getItem("usuario");
+
+      if (salvo) {
+        setUsuario(JSON.parse(salvo));
+      }
+    } catch {
+      setUsuario(null);
+    }
+
+    setVerificandoSessao(false);
   }, []);
 
   useEffect(() => {
+    if (!usuario) {
+      return;
+    }
+
+    carregarVoluntarios();
+  }, [usuario]);
+
+  useEffect(() => {
+    if (!usuario) {
+      return;
+    }
+
     carregarDadosDoDia();
-  }, [dataSelecionada]);
+  }, [dataSelecionada, usuario]);
 
   // Busca pelo nome no back-end, esperando o usuário parar de digitar.
   useEffect(() => {
@@ -296,20 +341,16 @@ export default function Home() {
     setBusca("");
   }
 
-  function abrirLogin() {
-    setMensagem("");
+  function sair() {
+    try {
+      localStorage.removeItem("usuario");
+    } catch {}
+
+    setUsuario(null);
     setFormularioLogin({
       email: "",
       senha: "",
     });
-    setLoginAberto(true);
-  }
-
-  function fecharLogin() {
-    if (carregandoLogin) {
-      return;
-    }
-    setLoginAberto(false);
   }
 
   function abrirCadastro() {
@@ -343,6 +384,63 @@ export default function Home() {
     }));
   }
 
+  function atualizarCampoConta(
+    campo: keyof typeof formularioConta,
+    valor: string
+  ) {
+    setFormularioConta((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+    }));
+  }
+
+  async function criarConta(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+
+    if (formularioConta.senha.length < 6) {
+      mostrarMensagem("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (formularioConta.senha !== formularioConta.confirmarSenha) {
+      mostrarMensagem("As senhas não conferem.");
+      return;
+    }
+
+    try {
+      setCarregandoConta(true);
+      setMensagem("");
+
+      await cadastrarUsuario(
+        formularioConta.nome,
+        formularioConta.email,
+        formularioConta.senha
+      );
+
+      setFormularioLogin({
+        email: formularioConta.email,
+        senha: "",
+      });
+
+      setFormularioConta({
+        nome: "",
+        email: "",
+        senha: "",
+        confirmarSenha: "",
+      });
+
+      setAbaAcesso("entrar");
+      mostrarMensagem("Conta criada com sucesso! Faça o login.", 4000);
+    } catch (error) {
+      mostrarMensagem(
+        error instanceof Error ? error.message : "Erro ao criar conta.",
+        4000
+      );
+    } finally {
+      setCarregandoConta(false);
+    }
+  }
+
   function atualizarCampoCadastro(
     campo: keyof typeof formularioCadastro,
     valor: string
@@ -370,10 +468,17 @@ export default function Home() {
       setCarregandoLogin(true);
       setMensagem("");
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const dados = await login(
+        formularioLogin.email,
+        formularioLogin.senha
+      );
 
-      setLoginAberto(false);
-      mostrarMensagem("Login realizado com sucesso!");
+      try {
+        localStorage.setItem("usuario", JSON.stringify(dados));
+      } catch {}
+
+      setUsuario(dados);
+      mostrarMensagem(`Bem-vindo(a), ${dados.nome}!`);
     } catch (error) {
       mostrarMensagem(
         error instanceof Error ? error.message : "Erro ao realizar login.",
@@ -601,6 +706,183 @@ export default function Home() {
     }
   }
 
+
+  if (verificandoSessao) {
+    return null;
+  }
+
+  if (!usuario) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f7fbf9] px-5 text-[#16423c]">
+        <div className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 text-center">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#174b45]">
+              Limpeza <span className="text-emerald-500">Brás</span>
+            </h1>
+
+            <p className="mt-1 text-sm font-medium text-slate-400">
+              {abaAcesso === "entrar"
+                ? "Entre para acessar o sistema"
+                : "Crie sua conta para acessar o sistema"}
+            </p>
+          </div>
+
+          <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setAbaAcesso("entrar")}
+              className={`rounded-xl py-2.5 text-sm font-bold transition ${
+                abaAcesso === "entrar"
+                  ? "bg-white text-emerald-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Entrar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAcesso("criar")}
+              className={`rounded-xl py-2.5 text-sm font-bold transition ${
+                abaAcesso === "criar"
+                  ? "bg-white text-emerald-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Criar conta
+            </button>
+          </div>
+
+          {abaAcesso === "criar" ? (
+            <form onSubmit={criarConta} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Nome
+                </label>
+
+                <input
+                  type="text"
+                  value={formularioConta.nome}
+                  onChange={(e) => atualizarCampoConta("nome", e.target.value)}
+                  placeholder="Seu nome"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  E-mail
+                </label>
+
+                <input
+                  type="email"
+                  value={formularioConta.email}
+                  onChange={(e) => atualizarCampoConta("email", e.target.value)}
+                  placeholder="seu.email@exemplo.com"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Senha
+                </label>
+
+                <input
+                  type="password"
+                  value={formularioConta.senha}
+                  onChange={(e) => atualizarCampoConta("senha", e.target.value)}
+                  placeholder="Mínimo de 6 caracteres"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Confirmar senha
+                </label>
+
+                <input
+                  type="password"
+                  value={formularioConta.confirmarSenha}
+                  onChange={(e) =>
+                    atualizarCampoConta("confirmarSenha", e.target.value)
+                  }
+                  placeholder="Repita a senha"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={carregandoConta}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3.5 text-sm font-extrabold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+              >
+                <UserRound size={18} />
+                {carregandoConta ? "Criando conta..." : "Criar conta"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={realizarLogin} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  E-mail
+                </label>
+
+                <input
+                  type="email"
+                  value={formularioLogin.email}
+                  onChange={(e) =>
+                    atualizarCampoLogin("email", e.target.value)
+                  }
+                  placeholder="seu.email@exemplo.com"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  Senha
+                </label>
+
+                <input
+                  type="password"
+                  value={formularioLogin.senha}
+                  onChange={(e) =>
+                    atualizarCampoLogin("senha", e.target.value)
+                  }
+                  placeholder="••••••••"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={carregandoLogin}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3.5 text-sm font-extrabold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+              >
+                <LogIn size={18} />
+                {carregandoLogin ? "Entrando..." : "Entrar"}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {mensagem && (
+          <div className="fixed left-4 right-4 top-4 z-[100] rounded-2xl bg-[#174b45] px-4 py-3 text-center text-sm font-bold text-white shadow-xl">
+            {mensagem}
+          </div>
+        )}
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#f7fbf9] pb-32 text-[#16423c]">
       <header className="border-b border-emerald-50 bg-white">
@@ -615,13 +897,19 @@ export default function Home() {
             </p>
           </div>
 
-          <button
-            onClick={abrirLogin}
-            className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
-          >
-            <LogIn size={18} />
-            <span>Login</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm font-bold text-slate-500 sm:block">
+              {usuario.nome}
+            </span>
+
+            <button
+              onClick={sair}
+              className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
+            >
+              <LogOut size={18} />
+              <span>Sair</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -965,7 +1253,7 @@ export default function Home() {
 
       {/* BARRA DE NAVEGAÇÃO FIXA NO RODAPÉ */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-6 py-3 shadow-[0_-5px_20px_rgba(0,0,0,0.04)] backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-center gap-3">
+        <div className="mx-auto flex max-w-lg flex-wrap items-center justify-center gap-2">
           <button
             type="button"
             onClick={abrirCadastro}
@@ -983,6 +1271,14 @@ export default function Home() {
             <Users size={18} />
             <span>Voluntários</span>
           </button>
+
+          <Link
+            href="/aniversariantes"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95 shadow-sm"
+          >
+            <Cake size={18} />
+            <span>Aniversariantes</span>
+          </Link>
         </div>
       </nav>
 
@@ -1284,76 +1580,6 @@ export default function Home() {
             >
               Fechar
             </button>
-          </div>
-        </div>
-      )}
-
-      {loginAberto && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
-          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">
-                  Acesso
-                </p>
-
-                <h3 className="mt-1 text-xl font-extrabold text-[#174b45]">
-                  Entrar no sistema
-                </h3>
-              </div>
-
-              <button
-                onClick={fecharLogin}
-                disabled={carregandoLogin}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 disabled:opacity-50"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={realizarLogin} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  E-mail
-                </label>
-
-                <input
-                  type="email"
-                  value={formularioLogin.email}
-                  onChange={(e) =>
-                    atualizarCampoLogin("email", e.target.value)
-                  }
-                  placeholder="seu.email@exemplo.com"
-                  required
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                  Senha
-                </label>
-
-                <input
-                  type="password"
-                  value={formularioLogin.senha}
-                  onChange={(e) =>
-                    atualizarCampoLogin("senha", e.target.value)
-                  }
-                  placeholder="••••••••"
-                  required
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={carregandoLogin}
-                className="w-full rounded-2xl bg-emerald-500 px-4 py-3.5 text-sm font-extrabold text-white transition hover:bg-emerald-600 disabled:opacity-50"
-              >
-                {carregandoLogin ? "Entrando..." : "Entrar"}
-              </button>
-            </form>
           </div>
         </div>
       )}
