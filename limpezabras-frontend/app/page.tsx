@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Cake,
+  TrendingUp,
   ChevronRight,
   LogIn,
   LogOut,
@@ -1253,7 +1254,7 @@ export default function Home() {
 
       {/* BARRA DE NAVEGAÇÃO FIXA NO RODAPÉ */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-6 py-3 shadow-[0_-5px_20px_rgba(0,0,0,0.04)] backdrop-blur">
-        <div className="mx-auto flex max-w-lg flex-wrap items-center justify-center gap-2">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2">
           <button
             type="button"
             onClick={abrirCadastro}
@@ -1278,6 +1279,14 @@ export default function Home() {
           >
             <Cake size={18} />
             <span>Aniversariantes</span>
+          </Link>
+
+          <Link
+            href="/frequencia"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95 shadow-sm"
+          >
+            <TrendingUp size={18} />
+            <span>Frequência</span>
           </Link>
         </div>
       </nav>

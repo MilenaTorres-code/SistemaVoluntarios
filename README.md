@@ -35,14 +35,40 @@ O projeto está sendo desenvolvido de forma incremental através das ACs.
 * Persistência no banco de dados
 * Testes da API com Swagger
 
+### AC3 — Login e aniversariantes
+
+**✅ Concluído**
+
+* Tela de login
+* Cadastro de usuário pelo site
+* Autenticação com senha criptografada
+* Validação de acesso ao sistema
+* Página de aniversariantes do mês
+* Quantidade e lista de aniversariantes em ordem de data
+* Integração Front-end e Back-end
+* Persistência no banco de dados
+* Testes da API com Swagger
+
+### Prova — Indicador de frequência
+
+**✅ Concluído**
+
+* Cálculo da frequência de cada voluntário ativo no mês
+* Dias de atividade: dias do mês com pelo menos uma presença registrada
+* Percentual de frequência: presenças ÷ dias de atividade
+* Classificação: Alta (75% ou mais), Média (50% a 74%) e Baixa (abaixo de 50%)
+* Frequência média e quantidade de voluntários por faixa
+* Página de frequência com seleção do mês
+* Integração Front-end e Back-end
+* Testes da API com Swagger
+* Diagrama de casos de uso, diagrama de classes e modelo lógico
+
 ### Próximas etapas
 
 **📌 Planejado**
 
 * Calendário de presença
-* Controle de frequência
 * Dashboard
-* Aniversariantes
 
 ## 🛠️ Tecnologias
 
@@ -85,7 +111,10 @@ Tabelas principais:
 ```text
 voluntarios   → cadastro dos voluntários (AC1)
 presencas     → registros de presença por data (AC2)
+usuarios      → usuários com acesso ao sistema (AC3)
 ```
+
+O indicador de frequência é calculado a partir da tabela `presencas`, sem tabela adicional.
 
 A API é desenvolvida em ASP.NET Core e utiliza Entity Framework Core para comunicação com o banco de dados.
 

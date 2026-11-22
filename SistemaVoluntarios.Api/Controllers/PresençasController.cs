@@ -260,6 +260,94 @@ public class PresencasController : ControllerBase
         });
     }
 
+    [HttpGet("frequencia")]
+    public async Task<IActionResult> Frequencia(int? mes, int? ano)
+    {
+        var mesConsulta = mes ?? DateTime.Today.Month;
+        var anoConsulta = ano ?? DateTime.Today.Year;
+
+        if (mesConsulta < 1 || mesConsulta > 12)
+            return BadRequest("Informe um mês entre 1 e 12.");
+
+        if (anoConsulta < 2000 || anoConsulta > 2100)
+            return BadRequest("Informe um ano válido.");
+
+        var inicio = new DateTime(anoConsulta, mesConsulta, 1);
+        var fim = inicio.AddMonths(1);
+
+        var presencasDoMes = await _context.Presencas
+            .Where(p => p.Data >= inicio && p.Data < fim)
+            .Select(p => new { p.VoluntarioId, p.Data })
+            .ToListAsync();
+
+        var totalDiasAtividade = presencasDoMes
+            .Select(p => p.Data.Date)
+            .Distinct()
+            .Count();
+
+        var voluntarios = await _context.Voluntarios
+            .Where(v => v.Ativo)
+            .Select(v => new { v.Id, v.NumeroCadastro, v.Nome })
+            .ToListAsync();
+
+        var frequencias = voluntarios
+            .Select(v =>
+            {
+                var presencas = presencasDoMes
+                    .Where(p => p.VoluntarioId == v.Id)
+                    .Select(p => p.Data.Date)
+                    .Distinct()
+                    .Count();
+
+                var percentual = totalDiasAtividade == 0
+                    ? 0
+                    : Math.Round(presencas * 100.0 / totalDiasAtividade, 1, MidpointRounding.AwayFromZero);
+
+                return new
+                {
+                    v.Id,
+                    v.NumeroCadastro,
+                    v.Nome,
+                    presencas,
+                    percentual,
+                    classificacao = totalDiasAtividade == 0
+                        ? "Sem atividade"
+                        : Classificar(percentual)
+                };
+            })
+            .OrderByDescending(f => f.percentual)
+            .ThenBy(f => f.Nome)
+            .ToList();
+
+        var mediaGeral = frequencias.Count == 0
+            ? 0
+            : Math.Round(frequencias.Average(f => f.percentual), 1, MidpointRounding.AwayFromZero);
+
+        return Ok(new
+        {
+            mes = mesConsulta,
+            ano = anoConsulta,
+            totalDiasAtividade,
+            totalVoluntarios = frequencias.Count,
+            mediaFrequencia = mediaGeral,
+            frequenciaAlta = frequencias.Count(f => f.classificacao == "Alta"),
+            frequenciaMedia = frequencias.Count(f => f.classificacao == "Média"),
+            frequenciaBaixa = frequencias.Count(f => f.classificacao == "Baixa"),
+            voluntarios = frequencias
+        });
+    }
+
+    private static string Classificar(double percentual)
+    {
+        if (percentual >= 75)
+            return "Alta";
+
+        if (percentual >= 50)
+            return "Média";
+
+        return "Baixa";
+    }
+
     private Task<bool> JaExistePresenca(
         int voluntarioId,
         DateTime data,

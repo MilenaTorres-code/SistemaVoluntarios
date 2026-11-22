@@ -387,3 +387,18 @@ export async function cadastrarUsuario(
 
   return JSON.parse(texto);
 }
+
+export async function buscarFrequencia(mes: number, ano: number) {
+  const resposta = await fetch(
+    `${API_URL}/Presencas/frequencia?mes=${mes}&ano=${ano}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao buscar a frequência dos voluntários.");
+  }
+
+  return resposta.json();
+}
