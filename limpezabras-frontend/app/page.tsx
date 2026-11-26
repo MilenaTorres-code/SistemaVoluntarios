@@ -892,10 +892,6 @@ export default function Home() {
             <h1 className="text-xl font-extrabold tracking-tight text-[#174b45]">
               Limpeza <span className="text-emerald-500">Brás</span>
             </h1>
-
-            <p className="mt-0.5 text-xs font-medium text-slate-400">
-              Juntos por um propósito maior
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
