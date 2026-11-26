@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVoluntarios.Api.Data;
 using SistemaVoluntarios.Api.DTOs;
@@ -6,6 +7,7 @@ using SistemaVoluntarios.Api.Models;
 
 namespace SistemaVoluntarios.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class PresencasController : ControllerBase

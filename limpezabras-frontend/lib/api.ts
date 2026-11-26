@@ -1,7 +1,38 @@
-const API_URL = "https://localhost:7020/api";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7020/api";
+
+function obterSessao() {
+  try {
+    const salvo = localStorage.getItem("usuario");
+    return salvo ? JSON.parse(salvo) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function requisicao(url: string, opcoes: RequestInit = {}) {
+  const sessao = obterSessao();
+  const headers = new Headers(opcoes.headers);
+
+  if (sessao?.token) {
+    headers.set("Authorization", `Bearer ${sessao.token}`);
+  }
+
+  const resposta = await fetch(url, { ...opcoes, headers });
+
+  if (resposta.status === 401 && sessao) {
+    try {
+      localStorage.removeItem("usuario");
+    } catch {}
+
+    window.location.href = "/";
+  }
+
+  return resposta;
+}
 
 export async function buscarPresencas(data: string) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas?data=${data}`,
     {
       cache: "no-store",
@@ -16,7 +47,7 @@ export async function buscarPresencas(data: string) {
 }
 
 export async function buscarResumo(data: string) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas/resumo?data=${data}`,
     {
       cache: "no-store",
@@ -31,7 +62,7 @@ export async function buscarResumo(data: string) {
 }
 
 export async function buscarVoluntarios() {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios`,
     {
       cache: "no-store",
@@ -46,7 +77,7 @@ export async function buscarVoluntarios() {
 }
 
 export async function buscarVoluntario(id: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/${id}`,
     {
       cache: "no-store",
@@ -69,7 +100,7 @@ export async function cadastrarVoluntario(dados: {
   dataNascimento: string;
   sexo: string;
 }) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios`,
     {
       method: "POST",
@@ -107,7 +138,7 @@ export async function atualizarVoluntario(
     sexo: string;
   }
 ) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/${id}`,
     {
       method: "PUT",
@@ -134,7 +165,7 @@ export async function atualizarVoluntario(
 }
 
 export async function ativarVoluntario(id: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/${id}/ativar`,
     {
       method: "PATCH",
@@ -157,7 +188,7 @@ export async function ativarVoluntario(id: number) {
 }
 
 export async function inativarVoluntario(id: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/${id}/inativar`,
     {
       method: "PATCH",
@@ -183,7 +214,7 @@ export async function registrarPresenca(
   voluntarioId: number,
   data: string
 ) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas`,
     {
       method: "POST",
@@ -213,7 +244,7 @@ export async function registrarPresenca(
 }
 
 export async function removerPresenca(id: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas/${id}`,
     {
       method: "DELETE",
@@ -230,7 +261,7 @@ export async function removerPresenca(id: number) {
 
 
 export async function buscarVoluntariosPorNome(nome: string) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/buscar?nome=${encodeURIComponent(nome)}`,
     {
       cache: "no-store",
@@ -249,7 +280,7 @@ export async function atualizarPresenca(
   voluntarioId: number,
   data: string
 ) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas/${id}`,
     {
       method: "PUT",
@@ -279,7 +310,7 @@ export async function atualizarPresenca(
 }
 
 export async function buscarPresencasDoVoluntario(voluntarioId: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas/voluntario/${voluntarioId}`,
     {
       cache: "no-store",
@@ -294,7 +325,7 @@ export async function buscarPresencasDoVoluntario(voluntarioId: number) {
 }
 
 export async function excluirVoluntario(id: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/${id}`,
     {
       method: "DELETE",
@@ -317,7 +348,7 @@ export async function excluirVoluntario(id: number) {
 }
 
 export async function login(email: string, senha: string) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Auth/login`,
     {
       method: "POST",
@@ -343,7 +374,7 @@ export async function login(email: string, senha: string) {
 }
 
 export async function buscarAniversariantes(mes: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Voluntarios/aniversariantes?mes=${mes}`,
     {
       cache: "no-store",
@@ -362,7 +393,7 @@ export async function cadastrarUsuario(
   email: string,
   senha: string
 ) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Auth/cadastrar`,
     {
       method: "POST",
@@ -389,7 +420,7 @@ export async function cadastrarUsuario(
 }
 
 export async function buscarFrequencia(mes: number, ano: number) {
-  const resposta = await fetch(
+  const resposta = await requisicao(
     `${API_URL}/Presencas/frequencia?mes=${mes}&ano=${ano}`,
     {
       cache: "no-store",

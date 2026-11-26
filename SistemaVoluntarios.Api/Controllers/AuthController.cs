@@ -1,6 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using SistemaVoluntarios.Api.Data;
 using SistemaVoluntarios.Api.DTOs;
 using SistemaVoluntarios.Api.Models;
@@ -12,11 +16,13 @@ namespace SistemaVoluntarios.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IConfiguration _configuration;
     private readonly PasswordHasher<Usuarios> _hasher = new();
 
-    public AuthController(AppDbContext context)
+    public AuthController(AppDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     [HttpPost("cadastrar")]
@@ -32,6 +38,15 @@ public class AuthController : ControllerBase
         if (dto.Senha.Length < 6)
         {
             return BadRequest("A senha deve ter pelo menos 6 caracteres.");
+        }
+
+        var existeUsuario = await _context.Usuarios.AnyAsync();
+
+        if (existeUsuario && User.Identity?.IsAuthenticated != true)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "Novas contas só podem ser criadas por um usuário logado.");
         }
 
         var email = dto.Email.Trim().ToLower();
@@ -98,7 +113,30 @@ public class AuthController : ControllerBase
         {
             usuario.Id,
             usuario.Nome,
-            usuario.Email
+            usuario.Email,
+            token = GerarToken(usuario)
         });
+    }
+
+    private string GerarToken(Usuarios usuario)
+    {
+        var chave = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(_configuration["Jwt:Chave"]!));
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new Claim(ClaimTypes.Name, usuario.Nome),
+            new Claim(ClaimTypes.Email, usuario.Email)
+        };
+
+        var token = new JwtSecurityToken(
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(8),
+            signingCredentials: new SigningCredentials(
+                chave,
+                SecurityAlgorithms.HmacSha256));
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
