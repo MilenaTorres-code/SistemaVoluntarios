@@ -433,3 +433,35 @@ export async function buscarFrequencia(mes: number, ano: number) {
 
   return resposta.json();
 }
+
+export async function buscarUsuarios() {
+  const resposta = await requisicao(
+    `${API_URL}/Usuarios`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!resposta.ok) {
+    throw new Error("Erro ao buscar usuários.");
+  }
+
+  return resposta.json();
+}
+
+export async function excluirUsuario(id: number) {
+  const resposta = await requisicao(
+    `${API_URL}/Usuarios/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!resposta.ok) {
+    const texto = await resposta.text();
+
+    throw new Error(
+      texto || "Erro ao excluir usuário."
+    );
+  }
+}

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Cake,
   TrendingUp,
+  UserCog,
   ChevronRight,
   LogIn,
   LogOut,
@@ -1283,6 +1284,14 @@ export default function Home() {
           >
             <TrendingUp size={18} />
             <span>Frequência</span>
+          </Link>
+
+          <Link
+            href="/usuarios"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95 shadow-sm"
+          >
+            <UserCog size={18} />
+            <span>Usuários</span>
           </Link>
         </div>
       </nav>
